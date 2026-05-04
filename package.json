@@ -1,6 +1,6 @@
 {
   "name": "devauditai",
-  "version": "1.0.0",
+  "version": "1.0.3",
   "description": "AI-powered code review agent for web projects. Analyses code quality, SEO, performance, security and accessibility.",
   "type": "module",
   "bin": {
@@ -22,12 +22,12 @@
     "react",
     "developer-tools"
   ],
-  "author": "Rohit Chavda",
+  "author": "Rohit Chauhan",
   "license": "MIT",
-  "homepage": "https://github.com/rohitchavda/devauditai",
+  "homepage": "https://github.com/mr-rpchauhan/codereviewai",
   "repository": {
     "type": "git",
-    "url": "https://github.com/rohitchavda/devauditai.git"
+    "url": "https://github.com/mr-rpchauhan/codereviewai.git"
   },
   "engines": {
     "node": ">=18.0.0"
