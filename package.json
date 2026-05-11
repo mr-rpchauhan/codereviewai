@@ -1,6 +1,6 @@
 {
   "name": "devauditai",
-  "version": "1.0.5",
+  "version": "1.0.10",
   "description": "AI-powered code review agent for web projects. Analyses code quality, SEO, performance, security and accessibility.",
   "type": "module",
   "bin": {
