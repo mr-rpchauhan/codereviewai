@@ -8,10 +8,14 @@ const INCLUDE_PATTERNS = [
   '**/package.json',
   '**/*.{css,scss,module.css}',
   '**/middleware.{js,ts}',
+  '**/.env',
   '**/.env.example',
+  '**/.env.local',
   '**/robots.txt',
   '**/sitemap.xml',
   '**/manifest.json',
+  '**/tailwind.config.{js,ts,mjs}',
+  '**/tsconfig.json',
 ];
 
 const EXCLUDE_DIRS = [
@@ -19,8 +23,8 @@ const EXCLUDE_DIRS = [
   'out', 'coverage', '.turbo', '.vercel', '__pycache__',
 ];
 
-const MAX_FILE_BYTES = 40_000;  // skip large files to reduce token usage
-const MAX_TOTAL_CHARS = 80_000; // reduced to stay within free tier token limits
+const MAX_FILE_BYTES = 50_000; // skip minified or generated files
+const MAX_TOTAL_CHARS = 800_000; // collect everything — tool executor manages per-area budgets // high limit — compression in tools.js handles token budget
 
 export async function collectProjectFiles(projectPath) {
   if (!fs.existsSync(projectPath)) {
@@ -52,11 +56,12 @@ export async function collectProjectFiles(projectPath) {
   const priority = (f) => {
     if (f.includes('next.config')) return 0;
     if (f.includes('middleware')) return 1;
-    if (f.includes('package.json') && !f.includes('node_modules')) return 2;
-    if (f.includes('/app/') || f.includes('/pages/')) return 3;
-    if (f.includes('/components/')) return 4;
-    if (f.includes('/lib/') || f.includes('/utils/')) return 5;
-    return 6;
+    if (f.includes('layout.') || f.includes('_document.')) return 2;
+    if (f.includes('package.json') && !f.includes('node_modules')) return 3;
+    if (f.includes('/app/') || f.includes('/pages/')) return 4;
+    if (f.includes('/components/')) return 5;
+    if (f.includes('/lib/') || f.includes('/utils/')) return 6;
+    return 7;
   };
 
   unique.sort((a, b) => priority(a) - priority(b));

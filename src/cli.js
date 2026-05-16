@@ -45,83 +45,110 @@ const MODELS = [
   },
 ];
 
-const VALID_AREAS   = ['code-quality', 'seo', 'performance', 'security', 'accessibility'];
-const VALID_OUTPUTS = ['console', 'markdown', 'json', 'both', 'md'];
-const VALID_MODELS  = MODELS.map(m => m.id);
+// ─── Phases ───────────────────────────────────────────────────────────────────
+const PHASES = [
+  {
+    id:    'seo',
+    name:  'SEO',
+    desc:  'Metadata, titles, canonical URLs, semantic HTML, sitemap',
+    note:  'Improve search engine visibility and rankings',
+    color: chalk.cyan,
+  },
+  {
+    id:    'performance',
+    name:  'Performance',
+    desc:  'Image optimization, bundle size, lazy loading, caching',
+    note:  'Improve page speed and Core Web Vitals',
+    color: chalk.yellow,
+  },
+  {
+    id:    'security',
+    name:  'Security',
+    desc:  'API security, secrets exposure, XSS, CSRF, headers',
+    note:  'Protect your application from vulnerabilities',
+    color: chalk.red,
+  },
+  {
+    id:    'accessibility',
+    name:  'Accessibility',
+    desc:  'ARIA attributes, keyboard nav, screen reader support',
+    note:  'Make your app usable for everyone — WCAG compliance',
+    color: chalk.green,
+  },
+  {
+    id:    'code-quality',
+    name:  'Code Quality',
+    desc:  'TypeScript, React hooks, error handling, best practices',
+    note:  'Keep your codebase clean and maintainable',
+    color: chalk.magenta,
+  },
+];
 
-// ─── Short flag aliases ────────────────────────────────────────────────────────
-// -o → --output   -f → --focus   -m → --model   -k → --set-saved-key
-// Model short names:  lite / flash-lite → gemini-2.5-flash-lite
-//                     flash             → gemini-2.5-flash
-const MODEL_ALIASES = {
-  'lite':       'gemini-2.5-flash-lite',
-  'flash-lite': 'gemini-2.5-flash-lite',
-  'flash':      'gemini-2.5-flash',
-};
+// ─── Output formats ───────────────────────────────────────────────────────────
+const OUTPUTS = [
+  {
+    id:    'console',
+    name:  'Console only',
+    desc:  'Print report to terminal',
+    color: chalk.cyan,
+  },
+  {
+    id:    'md',
+    name:  'Markdown file',
+    desc:  'Save as review-report.md in your project',
+    color: chalk.green,
+  },
+  {
+    id:    'both',
+    name:  'Both',
+    desc:  'Print to terminal + save review-report.md',
+    color: chalk.yellow,
+  },
+];
 
 // ─── Help ─────────────────────────────────────────────────────────────────────
 const HELP = `
 ${chalk.bold.cyan('devauditai')} — AI-powered Code Review Agent
 
 ${chalk.bold('USAGE')}
-  devauditai ${chalk.yellow('<path>')} [options]
-  devauditai ${chalk.yellow('.')}              Review current directory
+  devauditai ${chalk.yellow('<path>')}              Review a specific directory
+  devauditai ${chalk.yellow('.')}                   Review current directory
 
 ${chalk.bold('OPTIONS')}
-  ${chalk.cyan('-m, --model=<id>')}        Model to use (skips selector)
-  ${chalk.cyan('-f, --focus=<areas>')}     Areas to review, comma-separated (default: all)
-  ${chalk.cyan('-o, --output=<fmt>')}      Output format: console, markdown, json, both
-  ${chalk.cyan('-v, --version')}           Show version
-  ${chalk.cyan('-h, --help')}              Show this help
+  ${chalk.cyan('-h, --help')}                   Show this help
+  ${chalk.cyan('-v, --version')}                Show version number
 
-${chalk.bold('MODEL SHORTCUTS')}
-  ${chalk.yellow('lite')}  or  ${chalk.yellow('flash-lite')}  →  gemini-2.5-flash-lite  ${chalk.gray('(recommended)')}
-  ${chalk.yellow('flash')}              →  gemini-2.5-flash        ${chalk.gray('(best quality)')}
-
-${chalk.bold('API KEY PRIORITY')}  ${chalk.gray('(checked in this order on every run)')}
-  1. ${chalk.yellow('.env file')}       ${chalk.gray('GEMINI_API_KEY=... in your project folder')}
-  2. ${chalk.yellow('Saved key')}       ${chalk.gray('stored at ~/.devauditai/config.json')}
-  3. ${chalk.yellow('Shell export')}    ${chalk.gray('export GEMINI_API_KEY=... in .zshrc / .bashrc')}
-  ${chalk.gray('No key found → you will be prompted once, saved automatically as saved key')}
-
-${chalk.bold('SAVED KEY COMMANDS')}  ${chalk.gray('(global, priority 2)')}
+${chalk.bold('KEY COMMANDS')}
   ${chalk.cyan('-k, --set-saved-key=<key>')}   Save key to ~/.devauditai/config.json
   ${chalk.cyan('--del-saved')}                 Delete the saved key
-
-${chalk.bold('SHELL KEY COMMANDS')}  ${chalk.gray('(auto-detects .zshrc / .bashrc, priority 3)')}
-  ${chalk.cyan('--shell-key=<key>')}           Add export GEMINI_API_KEY to your shell config
-  ${chalk.cyan('--del-shell')}                 Remove GEMINI_API_KEY from your shell config
-
-${chalk.bold('REMOVE ALL KEYS')}
+  ${chalk.cyan('--shell-key=<key>')}           Add GEMINI_API_KEY to shell config (.zshrc/.bashrc) — Mac/Linux only
+  ${chalk.cyan('--del-shell')}                 Remove GEMINI_API_KEY from shell config — Mac/Linux only
   ${chalk.cyan('--del-all')}                   Delete saved key + remove from shell config
-  ${chalk.gray('Note: .env file is never auto-removed — manage it manually')}
 
 ${chalk.bold('EXAMPLES')}
   ${chalk.gray('$')} devauditai .
-  ${chalk.gray('$')} devauditai . -o md
-  ${chalk.gray('$')} devauditai . -f seo,performance
-  ${chalk.gray('$')} devauditai . -m flash
-  ${chalk.gray('$')} devauditai . -m lite -o json -f seo,security
+  ${chalk.gray('$')} devauditai /path/to/project
   ${chalk.gray('$')} devauditai . -k AIzaSy...
-  ${chalk.gray('$')} devauditai . --del-saved
-  ${chalk.gray('$')} devauditai . --shell-key=AIzaSy...
-  ${chalk.gray('$')} devauditai . --del-shell
+  ${chalk.gray('$')} devauditai . --set-saved-key=AIzaSy...
   ${chalk.gray('$')} devauditai . --del-all
+  ${chalk.gray('$')} devauditai --version
+  ${chalk.gray('$')} npx devauditai .
+  ${chalk.gray('$')} npx devauditai . -k AIzaSy...
 `;
 
 // ─── Arg parser ───────────────────────────────────────────────────────────────
 function normaliseArgs(argv) {
-  return argv.slice(2).map(a => {
-    if (a === '-h')             return '--help';
-    if (a === '-v')             return '--version';
-    if (a.startsWith('-o='))    return '--output='        + a.slice(3);
-    if (a.startsWith('-o '))    return '--output='        + a.slice(3);
-    if (a === '-o')             return '--output';
-    if (a.startsWith('-f='))    return '--focus='         + a.slice(3);
-    if (a.startsWith('-m='))    return '--model='         + a.slice(3);
-    if (a.startsWith('-k='))    return '--set-saved-key=' + a.slice(3);
-    return a;
-  });
+  const raw = argv.slice(2);
+  const out = [];
+  for (let i = 0; i < raw.length; i++) {
+    const a = raw[i];
+    if (a === '-h')  { out.push('--help');    continue; }
+    if (a === '-v')  { out.push('--version'); continue; }
+    if (a === '-k')  { out.push('--set-saved-key=' + (raw[++i] || '')); continue; }
+    if (a.startsWith('-k=')) { out.push('--set-saved-key=' + a.slice(3)); continue; }
+    out.push(a);
+  }
+  return out;
 }
 
 function parseArgs(argv) {
@@ -139,40 +166,13 @@ function parseArgs(argv) {
   if (setSavedKey) return { setSavedKey: setSavedKey.split('=')[1] };
 
   const setShellKey = flags.find(f => f.startsWith('--shell-key='));
-  if (setShellKey) return { shellKey: setShellKey.split('=')[1] };
+  if (setShellKey) return { shellKey: setShellKey.split('=')[1] }; 
 
   const projectPath = path.resolve(pos[0] || '.');
-
-  const outputRaw = flags.find(f => f.startsWith('--output='))?.split('=')[1];
-  const output    = outputRaw || 'console';
-  if (outputRaw && !VALID_OUTPUTS.includes(output)) {
-    console.error(chalk.red(`\n[!] Unknown -o/--output "${output}". Valid: ${VALID_OUTPUTS.join(', ')}\n`));
-    process.exit(1);
-  }
-
-  const focusRaw   = flags.find(f => f.startsWith('--focus='))?.split('=')[1];
-  const focusAreas = focusRaw ? focusRaw.split(',').map(s => s.trim()) : [...VALID_AREAS];
-  const invalid    = focusAreas.filter(a => !VALID_AREAS.includes(a));
-  if (invalid.length) {
-    console.error(chalk.red(`\n[!] Unknown -f/--focus area: ${invalid.join(', ')}\nValid: ${VALID_AREAS.join(', ')}\n`));
-    process.exit(1);
-  }
-
-  const modelRaw      = flags.find(f => f.startsWith('--model='))?.split('=')[1];
-  const modelResolved = modelRaw ? (MODEL_ALIASES[modelRaw] || modelRaw) : null;
-  if (modelResolved && !VALID_MODELS.includes(modelResolved)) {
-    console.error(chalk.red(
-      `\n[!] Unknown -m/--model "${modelRaw}"` +
-      `\nShortcuts: lite, flash-lite, flash` +
-      `\nFull IDs:  ${VALID_MODELS.join(', ')}\n`
-    ));
-    process.exit(1);
-  }
-
-  return { projectPath, output, focusAreas, modelId: modelResolved || null };
+  return { projectPath };
 }
 
-// ─── .env key helper (read-only — users manage .env manually) ────────────────
+// ─── .env key helper ──────────────────────────────────────────────────────────
 function readEnvFileKey() {
   try {
     const content = fs.readFileSync(ENV_FILE_PATH, 'utf8');
@@ -248,38 +248,30 @@ function deleteShellKey() {
   } catch { return { deleted: false, file }; }
 }
 
-// ─── Resolve API key (priority order) ────────────────────────────────────────
-// Priority 1 — .env file (read directly from file, not process.env)
-// Priority 2 — Saved key (~/.devauditai/config.json)
-// Priority 3 — Shell export (read from shell config file directly)
+// ─── Resolve API key ──────────────────────────────────────────────────────────
 function resolveApiKey() {
   const envFileKey = readEnvFileKey();
   if (envFileKey) {
     process.env.GEMINI_API_KEY = envFileKey;
     return { key: envFileKey, source: `.env file (${ENV_FILE_PATH})` };
   }
-
   const savedKey = loadSavedKey();
   if (savedKey) {
     process.env.GEMINI_API_KEY = savedKey;
     return { key: savedKey, source: `saved key (${SAVED_KEY_PATH})` };
   }
-
   const shellInfo = readShellKey();
   if (shellInfo) {
     process.env.GEMINI_API_KEY = shellInfo.key;
     return { key: shellInfo.key, source: `shell export (${shellInfo.file})` };
   }
-
-  // Final fallback — already exported in current session
   if (process.env.GEMINI_API_KEY) {
     return { key: process.env.GEMINI_API_KEY, source: 'shell export (current session)' };
   }
-
   return null;
 }
 
-// ─── Ask user for API key via terminal (saves as saved key) ──────────────────
+// ─── Ask user for API key ─────────────────────────────────────────────────────
 async function askForApiKey() {
   console.log(boxen(
     chalk.bold.yellow('GEMINI API KEY REQUIRED\n\n') +
@@ -289,7 +281,7 @@ async function askForApiKey() {
     chalk.gray('  2. Sign in with your Google account\n') +
     chalk.gray('  3. Click "Create API key"\n') +
     chalk.gray('  4. Copy the key and paste it below\n\n') +
-    chalk.gray('The key will be saved as your global saved key so you only need to do this once.'),
+    chalk.gray('The key will be saved so you only need to do this once.'),
     {
       padding: { top: 1, bottom: 1, left: 2, right: 2 },
       margin: { left: 1, bottom: 1 },
@@ -313,10 +305,7 @@ async function askForApiKey() {
         rl.close();
         saveSavedKey(key);
         process.env.GEMINI_API_KEY = key;
-        console.log(chalk.green(`\n  [+] Key saved to ${SAVED_KEY_PATH}`));
-        console.log(chalk.gray('      To update saved key:  devauditai -k YOUR_NEW_KEY'));
-        console.log(chalk.gray('      To delete saved key:  devauditai --del-saved'));
-        console.log(chalk.gray('      To use shell export:  devauditai --shell-key=YOUR_KEY\n'));
+        console.log(chalk.green(`\n  [+] Key saved to ${SAVED_KEY_PATH}\n`));
         resolve(key);
       });
     };
@@ -359,6 +348,73 @@ async function selectModel() {
   });
 }
 
+// ─── Phase selector ───────────────────────────────────────────────────────────
+async function selectPhase() {
+  console.log('\n');
+  console.log(boxen(
+    chalk.bold.white('SELECT A PHASE TO ANALYSE\n') +
+    chalk.gray('Each phase checks a specific aspect of your Next.js project.\n\n') +
+    PHASES.map((p, i) =>
+      `  ${chalk.bold.white(`${i + 1}.`)}  ${p.color.bold(p.name.padEnd(20))}\n` +
+      `      ${chalk.white(p.desc)}\n` +
+      `      ${chalk.gray('→ ' + p.note)}`
+    ).join('\n\n'),
+    { padding: { top: 1, bottom: 1, left: 2, right: 2 }, margin: { left: 1, bottom: 1 }, borderStyle: 'round', borderColor: 'yellow', title: '  devauditai  Phase Selector  ', titleAlignment: 'center' }
+  ));
+
+  return new Promise((resolve) => {
+    const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+    const ask = () => {
+      rl.question(chalk.yellow(`  Enter number (1-${PHASES.length}): `), (answer) => {
+        const num = parseInt(answer.trim(), 10);
+        if (num >= 1 && num <= PHASES.length) {
+          const selected = PHASES[num - 1];
+          rl.close();
+          console.log(`\n  ${chalk.green('[+]')}  Selected: ${selected.color.bold(selected.name)}\n`);
+          resolve(selected);
+        } else {
+          console.log(chalk.red(`  Invalid. Enter a number between 1 and ${PHASES.length}.`));
+          ask();
+        }
+      });
+    };
+    ask();
+  });
+}
+
+// ─── Output selector ──────────────────────────────────────────────────────────
+async function selectOutput() {
+  console.log('\n');
+  console.log(boxen(
+    chalk.bold.white('SELECT OUTPUT FORMAT\n') +
+    chalk.gray('How would you like to receive your report?\n\n') +
+    OUTPUTS.map((o, i) =>
+      `  ${chalk.bold.white(`${i + 1}.`)}  ${o.color.bold(o.name.padEnd(20))}\n` +
+      `      ${chalk.white(o.desc)}`
+    ).join('\n\n'),
+    { padding: { top: 1, bottom: 1, left: 2, right: 2 }, margin: { left: 1, bottom: 1 }, borderStyle: 'round', borderColor: 'green', title: '  devauditai  Output Selector  ', titleAlignment: 'center' }
+  ));
+
+  return new Promise((resolve) => {
+    const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+    const ask = () => {
+      rl.question(chalk.green(`  Enter number (1-${OUTPUTS.length}): `), (answer) => {
+        const num = parseInt(answer.trim(), 10);
+        if (num >= 1 && num <= OUTPUTS.length) {
+          const selected = OUTPUTS[num - 1];
+          rl.close();
+          console.log(`\n  ${chalk.green('[+]')}  Output: ${selected.color.bold(selected.name)}\n`);
+          resolve(selected);
+        } else {
+          console.log(chalk.red(`  Invalid. Enter a number between 1 and ${OUTPUTS.length}.`));
+          ask();
+        }
+      });
+    };
+    ask();
+  });
+}
+
 // ─── Validate key format ──────────────────────────────────────────────────────
 function validateKey(key, flag) {
   if (!key || !key.startsWith('AIza')) {
@@ -373,45 +429,36 @@ const opts = parseArgs(process.argv);
 if (opts.help)    { console.log(HELP); process.exit(0); }
 if (opts.version) { console.log(`devauditai v${VERSION}`); process.exit(0); }
 
-// Saved key commands
 if (opts.setSavedKey) {
   validateKey(opts.setSavedKey, '--set-saved-key');
   saveSavedKey(opts.setSavedKey);
   console.log(chalk.green(`\n[+] API key saved to ${SAVED_KEY_PATH}\n`));
-  console.log(chalk.gray('    Global key. Takes priority 2 on next run.\n'));
   process.exit(0);
 }
 if (opts.delSaved) {
   const deleted = deleteSavedKey();
   if (deleted) {
     console.log(chalk.green(`\n[+] Saved API key deleted from ${SAVED_KEY_PATH}\n`));
-    console.log(chalk.gray('    Your .env file and shell config are NOT affected.\n'));
   } else {
     console.log(chalk.yellow('\n[~] No saved key found — nothing to delete.\n'));
   }
   process.exit(0);
 }
-
-// Shell key commands
 if (opts.shellKey) {
   validateKey(opts.shellKey, '--shell-key');
   const file = writeShellKey(opts.shellKey);
   console.log(chalk.green(`\n[+] GEMINI_API_KEY added to ${file}\n`));
-  console.log(chalk.gray('    Run: source ' + file + ' (or open a new terminal) to apply.\n'));
   process.exit(0);
 }
 if (opts.delShell) {
   const { deleted, file } = deleteShellKey();
   if (deleted) {
     console.log(chalk.green(`\n[+] GEMINI_API_KEY removed from ${file}\n`));
-    console.log(chalk.gray('    Your saved key and .env file are NOT affected.\n'));
   } else {
     console.log(chalk.yellow(`\n[~] No GEMINI_API_KEY found in ${file} — nothing to delete.\n`));
   }
   process.exit(0);
 }
-
-// Delete all keys
 if (opts.delAll) {
   const savedDeleted = deleteSavedKey();
   const { deleted: shellDeleted, file } = deleteShellKey();
@@ -430,7 +477,7 @@ if (opts.delAll) {
   process.exit(0);
 }
 
-const { projectPath, output, focusAreas, modelId } = opts;
+const { projectPath } = opts;
 
 // ─── Banner ───────────────────────────────────────────────────────────────────
 console.log(boxen(
@@ -442,32 +489,29 @@ console.log(boxen(
 // ─── Main ─────────────────────────────────────────────────────────────────────
 async function main() {
 
-  // ── Step 1: Resolve API key ────────────────────────────────────────────────
+  // Step 1: Resolve API key
   const apiKeyInfo = resolveApiKey();
-
   if (apiKeyInfo) {
     console.log(`\n  ${chalk.green('[+]')}  API key loaded from ${chalk.cyan(apiKeyInfo.source)}`);
   } else {
     await askForApiKey();
   }
 
-  // ── Step 2: Show project info ──────────────────────────────────────────────
+  // Step 2: Show project info
   console.log('');
   console.log(`  ${chalk.bold('Path')}    ${chalk.yellow(projectPath)}`);
-  console.log(`  ${chalk.bold('Focus')}   ${chalk.cyan(focusAreas.join(', '))}`);
-  console.log(`  ${chalk.bold('Output')}  ${chalk.cyan(output)}`);
   console.log('');
 
-  // ── Step 3: Select model ───────────────────────────────────────────────────
-  let selectedModel;
-  if (modelId) {
-    selectedModel = MODELS.find(m => m.id === modelId);
-    console.log(`  ${chalk.green('[+]')}  Using model: ${selectedModel.color.bold(selectedModel.name)}\n`);
-  } else {
-    selectedModel = await selectModel();
-  }
+  // Step 3: Select model
+  const selectedModel = await selectModel();
 
-  // ── Step 4: Scan project ───────────────────────────────────────────────────
+  // Step 4: Select phase
+  const selectedPhase = await selectPhase();
+
+  // Step 5: Select output
+  const selectedOutput = await selectOutput();
+
+  // Step 6: Scan project
   const spinner = ora('Scanning project files...').start();
   let project;
   try {
@@ -482,10 +526,10 @@ async function main() {
     process.exit(1);
   }
 
-  // ── Step 5: Run agent ──────────────────────────────────────────────────────
+  // Step 7: Run agent
   console.log('');
-  const result = await runReviewAgent(project, focusAreas, selectedModel.id);
-  await generateReport(result, output, projectPath);
+  const result = await runReviewAgent(project, [selectedPhase.id], selectedModel.id);
+  await generateReport(result, selectedOutput.id, projectPath);
 }
 
 main().catch(err => {

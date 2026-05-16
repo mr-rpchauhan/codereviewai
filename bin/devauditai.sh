@@ -1,2 +1,2 @@
 #!/bin/bash
-node /usr/local/lib/node_modules/nextjs-review-agent/src/cli.js "$@"
+node /usr/local/lib/node_modules/devauditai/src/cli.js "$@"

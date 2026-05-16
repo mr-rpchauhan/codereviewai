@@ -45,7 +45,6 @@ console.log('');
 // ─── Step 0: Clean up old installs ────────────────────────────────────────────
 bold('  Step 0  Cleaning up old installations...');
 
-// Old binary paths to remove (Mac/Linux)
 const oldBinaries = [
   '/usr/local/bin/review',
   '/usr/bin/review',
@@ -53,23 +52,18 @@ const oldBinaries = [
   '/usr/bin/devauditai',
 ];
 
-// Old package names to uninstall
 const oldPackages = ['nextjs-review-agent', 'devauditai'];
 
 if (!isWindows) {
-  // Remove old binary files
   for (const bin of oldBinaries) {
     run(`sudo rm -f "${bin}" 2>/dev/null || rm -f "${bin}" 2>/dev/null`);
   }
-
-  // Also remove from nvm bin if exists
   const nvmBin = run(`dirname "$(which npm)" 2>/dev/null`).stdout?.toString().trim();
   if (nvmBin) {
     run(`rm -f "${nvmBin}/review" 2>/dev/null`);
     run(`rm -f "${nvmBin}/devauditai" 2>/dev/null`);
   }
 } else {
-  // Windows — remove old cmd wrappers
   const winBin = run(`npm bin -g 2>/dev/null`).stdout?.toString().trim();
   if (winBin) {
     run(`del /f "${winBin}\\review.cmd" 2>nul`);
@@ -77,7 +71,6 @@ if (!isWindows) {
   }
 }
 
-// Uninstall old global packages silently
 for (const pkg of oldPackages) {
   const npmFull = isWindows ? 'npm.cmd' : (run(`which npm`).stdout?.toString().trim() || 'npm');
   if (!isWindows) {
@@ -154,27 +147,35 @@ if (userOwned || isWindows) {
 }
 success('Globally installed');
 
-// ─── Step 6: Sync files to global location ────────────────────────────────────
+// ─── Step 6: Sync ALL files to global location ────────────────────────────────
 console.log('');
-bold('  Step 6  Ensuring correct files in global install...');
+bold('  Step 6  Syncing all files to global install...');
 
 if (existsSync(globalDir)) {
   const globalCli   = join(globalDir, 'src', 'cli.js');
   const globalAgent = join(globalDir, 'src', 'agent', 'agent.js');
 
-  if (globalCli !== cliPath) {
-    writeFileSync(globalCli,   CORRECT_CLI,   'utf8');
-    writeFileSync(globalAgent, CORRECT_AGENT, 'utf8');
-    if (!isWindows) { chmodSync(globalCli, '755'); chmodSync(globalAgent, '755'); }
+  // Always overwrite — no condition check, always syncs latest
+  writeFileSync(globalCli,   CORRECT_CLI,   'utf8');
+  writeFileSync(globalAgent, CORRECT_AGENT, 'utf8');
+  if (!isWindows) {
+    chmodSync(globalCli,   '755');
+    chmodSync(globalAgent, '755');
   }
+  info('cli.js synced');
+  info('agent.js synced');
 
+  // Sync all other source files
   const others = [
     'src/reporters/reporter.js',
     'src/tools/tools.js',
     'src/utils/collector.js',
   ];
   for (const f of others) {
-    try { copyFileSync(join(__dirname, f), join(globalDir, f)); } catch {}
+    try {
+      copyFileSync(join(__dirname, f), join(globalDir, f));
+      info(`${f} synced`);
+    } catch {}
   }
   success('All files synced to global install');
 } else {

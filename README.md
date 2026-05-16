@@ -1,6 +1,6 @@
 # devauditai
 
-AI-powered code review agent for web projects. Analyses your entire project — not just one file — and gives you a detailed report on code quality, SEO, performance, security, and accessibility.
+AI-powered code review agent for Next.js projects. Analyses your entire project and gives you a detailed report on code quality, SEO, performance, security, and accessibility.
 
 Powered by **Google Gemini** (free tier) · Works on **Mac, Linux, Windows**
 
@@ -13,7 +13,7 @@ cd your-project
 npx devauditai .
 ```
 
-On first run it will ask for your free Gemini API key, save it globally, then run the review. You won't be asked again.
+On first run it will ask for your free Gemini API key, save it globally, then guide you through the review. You won't be asked for the key again.
 
 ---
 
@@ -28,7 +28,7 @@ No credit card required.
 
 ---
 
-## Global install (for short command)
+## Global install (optional — for shorter command)
 
 ```bash
 npm install -g devauditai
@@ -37,124 +37,125 @@ devauditai .
 
 ---
 
-## Usage
+## How it works
 
-```bash
-# Review current directory
+Every run is fully interactive — just follow the prompts:
+
+```
 devauditai .
 
-# Review a specific path
-devauditai /path/to/project
+  [+] API key loaded
 
-# Save markdown report
-devauditai . -o md
+  ┌─ Step 1: Select Model ───────────────────────────────┐
+  │  1. Gemini 2.5 Flash Lite   RECOMMENDED              │
+  │     Fastest · 10 req/min · 20 req/day                │
+  │                                                       │
+  │  2. Gemini 2.5 Flash        BEST QUALITY             │
+  │     Deepest review · 5 req/min · 20 req/day          │
+  └───────────────────────────────────────────────────────┘
+  Enter number (1-2): 1
 
-# Focus on specific areas
-devauditai . -f seo,performance
+  ┌─ Step 2: Select Phase ───────────────────────────────┐
+  │  1. SEO           Metadata, titles, canonical URLs   │
+  │  2. Performance   Images, bundle size, caching       │
+  │  3. Security      API security, secrets, headers     │
+  │  4. Accessibility ARIA, keyboard nav, screen readers │
+  │  5. Code Quality  TypeScript, hooks, error handling  │
+  └───────────────────────────────────────────────────────┘
+  Enter number (1-5): 1
 
-# Use a specific model (skips the model selector)
-devauditai . -m flash
+  ┌─ Step 3: Select Output ──────────────────────────────┐
+  │  1. Console only    Print report to terminal         │
+  │  2. Markdown file   Save as review-report.md         │
+  │  3. Both            Console + markdown file          │
+  └───────────────────────────────────────────────────────┘
+  Enter number (1-3): 2
 
-# Combine options
-devauditai . -m lite -o json -f seo,security
+  → Scanning project...
+  → Analysing SEO...
+  → Report saved to review-report.md ✓
 ```
 
 ---
 
 ## What it checks
 
-| Area | What it looks for |
+| Phase | What it looks for |
 |---|---|
-| **Code Quality** | Unused vars, missing error handling, hooks violations, console.logs |
-| **SEO** | Missing metadata, og:image, robots.txt, sitemap, alt text |
-| **Performance** | Raw img tags, missing Suspense, N+1 fetches, large imports |
-| **Security** | Exposed secrets, SQL injection, missing auth, XSS risks |
-| **Accessibility** | Missing aria-labels, form labels, keyboard navigation |
-
----
-
-## Options
-
-| Option | Description |
-|---|---|
-| `-m, --model=<id>` | Model to use (skips the interactive selector) |
-| `-f, --focus=<areas>` | Comma-separated areas to review (default: all) |
-| `-o, --output=<fmt>` | Output format (default: console) |
-| `-v, --version` | Show version |
-| `-h, --help` | Show help |
-
-### Output formats
-
-| Value | Description |
-|---|---|
-| `console` | Print to terminal (default) |
-| `markdown` / `md` | Save `devauditai-report.md` |
-| `json` | Save `devauditai-report.json` |
-| `both` | Terminal + markdown file |
-
-### Focus areas
-
-```
-code-quality, seo, performance, security, accessibility
-```
+| **SEO** | Missing metadata, canonical URLs, og:image, robots.txt, sitemap, alt text, heading hierarchy |
+| **Performance** | Unoptimized images, large bundles, N+1 fetches, missing Suspense, caching |
+| **Security** | Exposed secrets, missing auth, XSS risks, insecure headers, mixed content |
+| **Accessibility** | Missing aria-labels, keyboard navigation, focus management, color contrast |
+| **Code Quality** | Unused vars, missing error handling, hooks violations, TypeScript issues |
 
 ---
 
 ## Models
 
-devauditai shows an interactive model selector on each run. Pass `-m` to skip it.
-
-| Model | Shortcut | Tag | RPM | RPD |
+| Model | Tag | Speed | RPM | RPD |
 |---|---|---|---|---|
-| `gemini-2.5-flash-lite` | `lite` or `flash-lite` | ⭐ RECOMMENDED | 10/min | 20/day |
-| `gemini-2.5-flash` | `flash` | BEST QUALITY | 5/min | 20/day |
+| `Gemini 2.5 Flash Lite` | ⭐ RECOMMENDED | Fastest | 10/min | 20/day |
+| `Gemini 2.5 Flash` | BEST QUALITY | Detailed | 5/min | 20/day |
 
-```bash
-devauditai . -m lite    # fastest, recommended
-devauditai . -m flash   # deepest review
-```
-
-All models are **free** to use.
+Both models are **free** to use.
 
 ---
 
-## API Key
+## CLI options
 
-On first run devauditai will prompt you for your key and save it automatically. You can also manage it manually with the commands below.
+```bash
+devauditai .                        # Review current directory
+devauditai /path/to/project         # Review specific directory
+devauditai --help                   # Show help
+devauditai --version                # Show version
+```
+
+---
+
+## API Key management
+
+On first run devauditai will prompt you for your key and save it automatically.
 
 ### Key priority (checked in this order on every run)
 
 | Priority | Source | How to set |
 |---|---|---|
 | 1 | `.env` file in your project | Add `GEMINI_API_KEY=your_key` to `.env` |
-| 2 | Saved key (global) | `devauditai -k YOUR_KEY` |
-| 3 | Shell export | `devauditai --shell-key=YOUR_KEY` |
+| 2 | Saved key (`~/.devauditai/config.json`) | `devauditai . -k YOUR_KEY` |
+| 3 | Shell config (`.zshrc` / `.bashrc`) | `devauditai . --shell-key=YOUR_KEY` |
 
-The first key found is used. If none found → you are prompted once and the key is saved globally (priority 2).
-
-### Saved key commands (global · `~/.devauditai/config.json`)
+### Key commands
 
 ```bash
-devauditai -k AIzaSy...    # save key globally
-devauditai --del-saved     # delete saved key
+# Save key globally (works on Mac, Linux, Windows)
+devauditai . -k AIzaSy...
+devauditai . --set-saved-key=AIzaSy...
+
+# Add key to shell config — Mac/Linux only
+devauditai . --shell-key=AIzaSy...
+
+# Delete saved key
+devauditai . --del-saved
+
+# Remove key from shell config — Mac/Linux only
+devauditai . --del-shell
+
+# Delete everything (saved key + shell config)
+devauditai . --del-all
 ```
 
-### Shell key commands (auto-detects `.zshrc` / `.bashrc`)
+> **Note:** `.env` file is never auto-removed — delete `GEMINI_API_KEY` from it manually if needed.
+
+> **Windows users:** `--shell-key` and `--del-shell` commands are not supported on Windows. Use `-k` to save your key globally instead.
+
+### Using with npx
 
 ```bash
-devauditai --shell-key=AIzaSy...   # add export to shell config
-devauditai --del-shell             # remove from shell config
+npx devauditai .
+npx devauditai . -k AIzaSy...
+npx devauditai . --del-all
+npx devauditai --version
 ```
-
-> After `--shell-key`, run `source ~/.zshrc` (or open a new terminal) to apply.
-
-### Remove all keys
-
-```bash
-devauditai --del-all    # deletes saved key + removes from shell config
-```
-
-> Note: `.env` file is never auto-removed — delete `GEMINI_API_KEY` from it manually if needed.
 
 ---
 

@@ -3,7 +3,6 @@ import path from 'path';
 import chalk from 'chalk';
 import boxen from 'boxen';
 
-// ─── Area config ───────────────────────────────────────────────────────────────
 const AREA_CONFIG = {
   code_quality:  { label: 'Code Quality',  short: 'Code Quality',  tag: 'CODE' },
   seo:           { label: 'SEO',            short: 'SEO',           tag: 'SEO'  },
@@ -12,7 +11,6 @@ const AREA_CONFIG = {
   accessibility: { label: 'Accessibility',  short: 'Accessibility', tag: 'A11Y' },
 };
 
-// ─── Severity config ───────────────────────────────────────────────────────────
 const SEV = {
   critical:   { label: '[!] MUST FIX',   color: chalk.red.bold    },
   warning:    { label: '[~] SHOULD FIX', color: chalk.yellow.bold  },
@@ -21,186 +19,191 @@ const SEV = {
 
 function sev(s) { return SEV[s] || SEV.suggestion; }
 
-// ─── Score helpers ─────────────────────────────────────────────────────────────
-function scoreColor(n) {
-  if (n >= 80) return chalk.bold.green(n);
-  if (n >= 60) return chalk.bold.yellow(n);
-  return chalk.bold.red(n);
+function getGrade(n) {
+  if (n >= 90) return { grade: 'A', label: 'Excellent', color: chalk.bold.green  };
+  if (n >= 75) return { grade: 'B', label: 'Good',      color: chalk.bold.green  };
+  if (n >= 50) return { grade: 'C', label: 'Fair',      color: chalk.bold.yellow };
+  if (n >= 25) return { grade: 'D', label: 'Poor',      color: chalk.bold.red    };
+  return              { grade: 'F', label: 'Critical',  color: chalk.bold.red    };
+}
+
+function gradeColor(n) {
+  const { grade, label, color } = getGrade(n);
+  return color(`${grade} — ${label}`);
 }
 
 function scoreBar(n, width = 20) {
   const filled = Math.round((n / 100) * width);
-  const bar = '#'.repeat(filled) + '-'.repeat(width - filled);
-  if (n >= 80) return chalk.green(bar);
-  if (n >= 60) return chalk.yellow(bar);
+  const empty  = width - filled;
+  const bar    = '█'.repeat(filled) + '░'.repeat(empty);
+  const { grade } = getGrade(n);
+  if (grade === 'A' || grade === 'B') return chalk.green(bar);
+  if (grade === 'C') return chalk.yellow(bar);
   return chalk.red(bar);
 }
 
-function scoreStatus(n) {
-  if (n >= 90) return chalk.bold.green('Excellent');
-  if (n >= 80) return chalk.bold.green('Good');
-  if (n >= 60) return chalk.bold.yellow('Fair');
-  if (n >= 40) return chalk.bold.red('Poor');
-  return chalk.bold.red('Critical');
-}
-
 function scoreStatusMd(n) {
-  if (n >= 90) return 'Excellent';
-  if (n >= 80) return 'Good';
-  if (n >= 60) return 'Fair';
-  if (n >= 40) return 'Poor';
-  return 'Critical';
+  const { grade, label } = getGrade(n);
+  return `${grade} — ${label}`;
 }
 
-// ─── Line helpers ──────────────────────────────────────────────────────────────
-const W = 62; // report width
+// Strip ANSI escape codes to get visible length
+function visibleLength(str) {
+  return str.replace(/\x1B\[[0-9;]*m/g, '').length;
+}
+
+// Pad a colored string to a target visible width
+function padColored(coloredStr, targetWidth) {
+  const visible = visibleLength(coloredStr);
+  const pad = Math.max(0, targetWidth - visible);
+  return coloredStr + ' '.repeat(pad);
+}
+
+const W = 62;
 function heavyLine() { return chalk.gray('━'.repeat(W)); }
 function thinLine()  { return chalk.gray('─'.repeat(W)); }
-function padRight(str, len) {
-  const clean = str.replace(/\x1b\[[0-9;]*m/g, '');
-  return str + ' '.repeat(Math.max(0, len - clean.length));
-}
 
-// ─── Console reporter ──────────────────────────────────────────────────────────
 function printConsoleReport(result) {
-  const { summary, areas, top_priorities, quick_wins, _meta } = result;
+  let { summary, areas, top_priorities, quick_wins, _meta } = result;
+
+  for (const [key, area] of Object.entries(areas || {})) {
+    if (area && area.issues && area.issues.length > 0 && area.score === 0) {
+      const deduction =
+        area.issues.filter(i => i.severity === 'critical').length   * 15 +
+        area.issues.filter(i => i.severity === 'warning').length    * 5  +
+        area.issues.filter(i => i.severity === 'suggestion').length * 2;
+      area.score = Math.max(0, 100 - deduction);
+    }
+  }
+
+  const areaScores = Object.values(areas || {}).map(a => a.score).filter(s => s > 0);
+  if (areaScores.length > 0) {
+    summary.overall_score = Math.round(areaScores.reduce((a, b) => a + b, 0) / areaScores.length);
+  }
+
+  const allIssues = Object.values(areas || {}).flatMap(a => a.issues || []);
+  if (allIssues.length > 0) {
+    summary.critical_issues = allIssues.filter(i => i.severity === 'critical').length;
+    summary.warnings        = allIssues.filter(i => i.severity === 'warning').length;
+    summary.suggestions     = allIssues.filter(i => i.severity === 'suggestion').length;
+  }
+
   const projectName = path.basename(process.cwd());
   const date = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
 
   console.log('\n');
-
-  // ── Header ─────────────────────────────────────────────────────────────────
   console.log(chalk.bold.white('╔' + '═'.repeat(W) + '╗'));
   console.log(chalk.bold.white('║') + chalk.bold.cyan('              Next.js Project Health Report'.padEnd(W)) + chalk.bold.white('║'));
   console.log(chalk.bold.white('║') + chalk.gray(`         ${projectName}  ·  ${date}`.padEnd(W)) + chalk.bold.white('║'));
   console.log(chalk.bold.white('╚' + '═'.repeat(W) + '╝'));
-
   console.log('');
 
-  // ── Overall score ──────────────────────────────────────────────────────────
-  console.log(`  ${chalk.bold('Overall Score')}    ${scoreColor(summary.overall_score)} ${chalk.gray('/ 100')}`);
+  const overallGrade = getGrade(summary.overall_score);
+  console.log(`  ${chalk.bold('Grade')}            ${overallGrade.color(overallGrade.grade + ' — ' + overallGrade.label)}`);
   console.log(`  ${scoreBar(summary.overall_score, 32)}`);
-  console.log(`  ${chalk.bold('Status')}           ${scoreStatus(summary.overall_score)}`);
   console.log('');
   console.log(
     `  ${chalk.red.bold(`[!] ${summary.critical_issues} Must Fix`)}` +
     `      ${chalk.yellow.bold(`[~] ${summary.warnings} Should Fix`)}` +
     `      ${chalk.cyan.bold(`[i] ${summary.suggestions} Consider`)}`
   );
-
   console.log('\n');
 
-  // ── Score breakdown table ──────────────────────────────────────────────────
-  console.log(chalk.bold.white('┌' + '─'.repeat(W) + '┐'));
-  console.log(chalk.bold.white('│') + chalk.bold.white('  SCORE BREAKDOWN'.padEnd(W)) + chalk.bold.white('│'));
-  console.log(chalk.bold.white('├──────────────────────────┬──────────┬──────────────────────┬───────────┤'));
-  console.log(chalk.bold.white('│') + chalk.gray('  Area                    │  Score   │ Health Bar           │ Status    ') + chalk.bold.white('│'));
-  console.log(chalk.bold.white('├──────────────────────────┼──────────┼──────────────────────┼───────────┤'));
+  // Score breakdown
+  // Column visible widths: area=26, bar=22, grade=15 → total inner = 65
+  const TW = 65; // actual table width: 26 + 1(│) + 22 + 1(│) + 15
+  console.log(chalk.bold.white('┌' + '─'.repeat(TW) + '┐'));
+  console.log(chalk.bold.white('│') + chalk.bold.white('  SCORE BREAKDOWN'.padEnd(TW)) + chalk.bold.white('│'));
+  console.log(chalk.bold.white('├──────────────────────────┬──────────────────────┬───────────────┤'));
+  console.log(chalk.bold.white('│') + chalk.gray('  Area                    │ Health Bar           │ Grade         ') + chalk.bold.white('│'));
+  console.log(chalk.bold.white('├──────────────────────────┼──────────────────────┼───────────────┤'));
 
   for (const [key, cfg] of Object.entries(AREA_CONFIG)) {
     const area = areas?.[key];
     if (!area) continue;
-    const areaCol   = ('  ' + cfg.short).padEnd(26);
-    const scoreCol  = (`  ${area.score}/100`).padEnd(10);
-    const barCol    = ' ' + scoreBar(area.score, 20) + ' ';
-    const statusStr = area.score >= 90 ? 'Excellent'
-      : area.score >= 80 ? 'Good'
-      : area.score >= 60 ? 'Fair'
-      : area.score >= 40 ? 'Poor'
-      : 'Critical';
-    const statusCol = ' ' + scoreStatus(area.score) + ' '.repeat(Math.max(0, 10 - statusStr.length));
-    console.log(
-      chalk.white('│') + chalk.white(areaCol) +
-      chalk.white('│') + scoreColor(area.score) + '        ' +
-      chalk.white('│') + barCol +
-      chalk.white('│') + statusCol +
-      chalk.white('│')
-    );
+
+    // Col 1: area name — 26 visible chars
+    const areaCol = ('  ' + cfg.short).padEnd(26);
+
+    // Col 2: health bar — always exactly 22 visible chars (1 space + 20 bar + 1 space)
+    const barWidth  = 20;
+    const filled    = Math.round(area.score / 100 * barWidth);
+    const empty     = barWidth - filled;
+    const rawBar    = '█'.repeat(filled) + '░'.repeat(empty); // exactly 20 visible chars
+    const { grade, label, color } = getGrade(area.score);
+    const coloredBar = grade === 'A' || grade === 'B' ? chalk.green(rawBar)
+                     : grade === 'C'                  ? chalk.yellow(rawBar)
+                     :                                  chalk.red(rawBar);
+
+    // Col 3: grade — 15 visible chars (1 space + label + padding)
+    const gradeStr = `${grade} — ${label}`;           // e.g. "A — Excellent" = 13 chars
+    const gradePad = ' '.repeat(Math.max(0, 14 - gradeStr.length));
+
+    // Build row: use padColored so ANSI codes never affect column widths
+    const row =
+      '│' + padColored(chalk.white(areaCol), 26) +
+      '│' + ' ' + coloredBar + ' ' +               // raw bar is exactly 20 visible chars
+      '│' + padColored(' ' + color(gradeStr), 15) +
+      '│';
+
+    console.log(row);
   }
 
-  console.log(chalk.bold.white('└──────────────────────────┴──────────┴──────────────────────┴───────────┘'));
+  console.log(chalk.bold.white('└──────────────────────────┴──────────────────────┴───────────────┘'));
   console.log('');
 
-  // ── Issues per area ────────────────────────────────────────────────────────
   for (const [key, cfg] of Object.entries(AREA_CONFIG)) {
     const area = areas?.[key];
     if (!area?.issues?.length) continue;
-
     console.log('\n');
     console.log(heavyLine());
     console.log(
       chalk.bold.white(`  [${cfg.tag}]  ${cfg.label}`) +
-      chalk.gray(`          Score: `) + scoreColor(area.score) + chalk.gray(' / 100')
+      chalk.gray(`          Grade: `) + gradeColor(area.score)
     );
     console.log(heavyLine());
     console.log('');
-
     area.issues.forEach((issue, idx) => {
       const s = sev(issue.severity);
-
-      // Issue number + severity — right aligned
-      const leftPart  = chalk.bold.white(`  Issue ${idx + 1} of ${area.issues.length}`);
-      const rightPart = s.color(s.label);
-      const leftClean = `  Issue ${idx + 1} of ${area.issues.length}`;
+      const leftPart   = chalk.bold.white(`  Issue ${idx + 1} of ${area.issues.length}`);
+      const rightPart  = s.color(s.label);
+      const leftClean  = `  Issue ${idx + 1} of ${area.issues.length}`;
       const rightClean = s.label;
-      const spaces    = ' '.repeat(Math.max(1, W - leftClean.length - rightClean.length));
+      const spaces     = ' '.repeat(Math.max(1, W - leftClean.length - rightClean.length));
       console.log(leftPart + spaces + rightPart);
       console.log(thinLine());
-
-      // Title
       console.log(`  ${chalk.bold('Title')}      ${chalk.white(issue.title)}`);
-
-      // File
-      if (issue.file) {
-        console.log(`  ${chalk.bold('File')}       ${chalk.cyan(issue.file)}`);
-      }
-
+      if (issue.file) console.log(`  ${chalk.bold('File')}       ${chalk.cyan(issue.file)}`);
       console.log('');
-
-      // Problem
       console.log(`  ${chalk.bold.white('Problem')}`);
       const descWords = issue.description.split(' ');
       let line = '  ';
       descWords.forEach(word => {
-        if ((line + word).length > W - 2) {
-          console.log(line);
-          line = '  ' + word + ' ';
-        } else {
-          line += word + ' ';
-        }
+        if ((line + word).length > W - 2) { console.log(line); line = '  ' + word + ' '; }
+        else line += word + ' ';
       });
       if (line.trim()) console.log(line);
-
-      // If you fix this
       if (issue.pros?.length) {
         console.log('');
         console.log(`  ${chalk.bold.green('If You Fix This')}`);
         issue.pros.forEach(p => console.log(`    ${chalk.green('+')}  ${p}`));
       }
-
-      // If you ignore this
       if (issue.cons?.length) {
         console.log('');
         console.log(`  ${chalk.bold.red('If You Ignore This')}`);
         issue.cons.forEach(c => console.log(`    ${chalk.red('-')}  ${c}`));
       }
-
-      // How to fix
       if (issue.fix) {
         console.log('');
         console.log(`  ${chalk.bold.cyan('How To Fix')}`);
-        issue.fix.split('\n').forEach(fl => {
-          console.log(`    ${chalk.cyan(fl)}`);
-        });
+        issue.fix.split('\n').forEach(fl => console.log(`    ${chalk.cyan(fl)}`));
       }
-
       console.log('');
       console.log(thinLine());
       console.log('');
     });
   }
 
-  // ── Fix these first ────────────────────────────────────────────────────────
   if (top_priorities?.length) {
     console.log('');
     console.log(chalk.bold.white('┌' + '─'.repeat(W) + '┐'));
@@ -209,16 +212,13 @@ function printConsoleReport(result) {
     console.log(chalk.bold.white('├' + '─'.repeat(W) + '┤'));
     top_priorities.forEach((p, i) => {
       const prefix = `  ${i + 1}.  `;
-      const maxLen = W - prefix.length;
       const words = p.split(' ');
       let line = prefix;
       words.forEach(word => {
         if ((line + word).length > W - 1) {
           console.log(chalk.bold.white('│') + chalk.white(line.padEnd(W)) + chalk.bold.white('│'));
           line = ' '.repeat(prefix.length) + word + ' ';
-        } else {
-          line += word + ' ';
-        }
+        } else line += word + ' ';
       });
       if (line.trim()) console.log(chalk.bold.white('│') + chalk.white(line.trimEnd().padEnd(W)) + chalk.bold.white('│'));
     });
@@ -226,7 +226,6 @@ function printConsoleReport(result) {
     console.log('');
   }
 
-  // ── Easy wins ──────────────────────────────────────────────────────────────
   if (quick_wins?.length) {
     console.log(chalk.bold.white('┌' + '─'.repeat(W) + '┐'));
     console.log(chalk.bold.white('│') + chalk.bold.green('  [+]  EASY WINS'.padEnd(W)) + chalk.bold.white('│'));
@@ -240,9 +239,7 @@ function printConsoleReport(result) {
         if ((line + word).length > W - 1) {
           console.log(chalk.bold.white('│') + chalk.white(line.padEnd(W)) + chalk.bold.white('│'));
           line = ' '.repeat(prefix.length) + word + ' ';
-        } else {
-          line += word + ' ';
-        }
+        } else line += word + ' ';
       });
       if (line.trim()) console.log(chalk.bold.white('│') + chalk.white(line.trimEnd().padEnd(W)) + chalk.bold.white('│'));
     });
@@ -250,21 +247,46 @@ function printConsoleReport(result) {
     console.log('');
   }
 
-  // ── Footer ─────────────────────────────────────────────────────────────────
   console.log(chalk.gray(
     `  Analysed by Next.js Review Agent  ·  ` +
     `Model: ${_meta?.model || 'gemini'}  ·  ` +
     `${_meta?.toolCalls || '?'} tool calls  ·  ` +
     `${_meta?.steps || '?'} reasoning steps\n`
   ));
+  console.log(
+    chalk.gray('  ─────────────────────────────────────────────────────────────────') + '\n' +
+    chalk.gray('  ℹ  AI-powered analysis gets smarter with each run.') + '\n' +
+    chalk.gray('     Run the same phase again to discover additional insights.') + '\n' +
+    chalk.gray('     Start with [!] Must Fix issues for the highest impact on your project.')
+  );
 }
 
-// ─── Markdown reporter ─────────────────────────────────────────────────────────
 function buildMarkdownReport(result, projectPath) {
-  const { summary, areas, top_priorities, quick_wins, _meta } = result;
+  let { summary, areas, top_priorities, quick_wins, _meta } = result;
+
+  for (const [key, area] of Object.entries(areas || {})) {
+    if (area && area.issues && area.issues.length > 0 && area.score === 0) {
+      const deduction =
+        area.issues.filter(i => i.severity === 'critical').length   * 15 +
+        area.issues.filter(i => i.severity === 'warning').length    * 5  +
+        area.issues.filter(i => i.severity === 'suggestion').length * 2;
+      area.score = Math.max(0, 100 - deduction);
+    }
+  }
+
+  const areaScores2 = Object.values(areas || {}).map(a => a.score).filter(s => s > 0);
+  if (areaScores2.length > 0) {
+    summary.overall_score = Math.round(areaScores2.reduce((a, b) => a + b, 0) / areaScores2.length);
+  }
+  const allIssues2 = Object.values(areas || {}).flatMap(a => a.issues || []);
+  if (allIssues2.length > 0) {
+    summary.critical_issues = allIssues2.filter(i => i.severity === 'critical').length;
+    summary.warnings        = allIssues2.filter(i => i.severity === 'warning').length;
+    summary.suggestions     = allIssues2.filter(i => i.severity === 'suggestion').length;
+  }
+
   const projectName = path.basename(projectPath);
   const date = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
-
   const sevLabel = {
     critical:   '[!] Must Fix',
     warning:    '[~] Should Fix',
@@ -283,9 +305,7 @@ function buildMarkdownReport(result, projectPath) {
 
 ---
 
-## Overall Score: ${summary.overall_score} / 100
-
-**Status:** ${scoreStatusMd(summary.overall_score)}
+## Grade: ${scoreStatusMd(summary.overall_score)}
 
 | Priority | Count |
 |----------|-------|
@@ -299,13 +319,15 @@ function buildMarkdownReport(result, projectPath) {
 
 ## Score Breakdown
 
-| Area | Score | Health | Status |
-|------|-------|--------|--------|
+| Area | Health | Grade |
+|------|--------|-------|
 ${Object.entries(AREA_CONFIG).map(([key, cfg]) => {
   const area = areas?.[key];
   if (!area) return '';
-  const bar = '#'.repeat(Math.round(area.score / 5)) + '-'.repeat(20 - Math.round(area.score / 5));
-  return `| **${cfg.label}** | ${area.score} / 100 | \`${bar}\` | ${scoreStatusMd(area.score)} |`;
+  const filled = Math.round(area.score / 5);
+  const empty  = 20 - filled;
+  const bar    = '█'.repeat(filled) + '░'.repeat(empty);
+  return `| **${cfg.label}** | ${bar} | ${scoreStatusMd(area.score)} |`;
 }).filter(Boolean).join('\n')}
 
 ---
@@ -331,10 +353,9 @@ ${(quick_wins || []).map((w, i) => `**${i + 1}.** ${w}`).join('\n\n')}
 ${Object.entries(AREA_CONFIG).map(([key, cfg]) => {
   const area = areas?.[key];
   if (!area?.issues?.length) return '';
-
   return `---
 
-## [${cfg.tag}] ${cfg.label} — ${area.score}/100 — ${scoreStatusMd(area.score)}
+## [${cfg.tag}] ${cfg.label} — Grade: ${scoreStatusMd(area.score)}
 
 ${area.issues.map((issue, idx) => {
   const sLabel = sevLabel[issue.severity] || '[i] Consider';
@@ -369,19 +390,34 @@ ${issue.fix}
 
 ---
 
+> **✨ Pro Tip**
+> Run the same phase again to uncover additional insights — AI analysis gets deeper with each review.
+> Start with **[!] Must Fix** issues for the highest impact on your project.
+> Your grade improves as you fix issues and re-run the analysis.
+
 _Generated by Next.js Review Agent · ${date}_
 `;
 
   return md;
 }
 
-// ─── Main export ───────────────────────────────────────────────────────────────
 export async function generateReport(result, outputMode, projectPath) {
-  printConsoleReport(result);
+  if (outputMode === 'console' || outputMode === 'both') {
+    printConsoleReport(result);
+  }
 
-  if (outputMode === 'markdown' || outputMode === 'both' || outputMode === 'md') {
+  if (outputMode === 'md' || outputMode === 'markdown' || outputMode === 'both') {
     const md = buildMarkdownReport(result, projectPath);
-    const outPath = path.join(projectPath, 'review-report.md');
+    const areaName = Object.keys(result.areas || {})[0] || 'review';
+    const now = new Date();
+    const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    const timestamp = String(now.getDate()).padStart(2, '0') + '-' +
+      MONTHS[now.getMonth()] + '-' +
+      now.getFullYear() + '_' +
+      String(now.getHours()).padStart(2, '0') + 'h' +
+      String(now.getMinutes()).padStart(2, '0') + 'm' +
+      String(now.getSeconds()).padStart(2, '0') + 's';
+    const outPath = path.join(projectPath, areaName.replace(/_/g, '-') + '-report_' + timestamp + '.md');
     fs.writeFileSync(outPath, md, 'utf8');
     console.log(chalk.green(`\n  Report saved  `) + chalk.cyan(outPath) + '\n');
   }
